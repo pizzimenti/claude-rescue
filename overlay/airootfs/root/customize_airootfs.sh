@@ -18,8 +18,19 @@
 
 set -euo pipefail
 
-echo "==> [customize_airootfs.sh] Installing @anthropic-ai/claude-code globally..."
-npm install -g @anthropic-ai/claude-code
+# Pin to the version whose `lastOnboardingVersion` is hardcoded in
+# overlay/airootfs/root/.claude.json. These two MUST stay in lockstep:
+# an unpinned `npm install -g` will pull whatever is `latest` at build
+# time, and if that release bumps onboardingVersion past what the
+# pre-baked .claude.json declares, the rescue ISO's first `claude`
+# launch will pop the onboarding dialog instead of going straight to
+# the prompt — exactly the regression the pre-baked JSON exists to
+# prevent. When bumping Claude Code: update BOTH this version AND
+# the lastOnboardingVersion in .claude.json in the same commit.
+CLAUDE_CODE_VERSION=2.1.97
+
+echo "==> [customize_airootfs.sh] Installing @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} globally..."
+npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
 
 # Verify the binary actually landed on PATH so the rescue launcher can
 # rely on it without a runtime fallback path.

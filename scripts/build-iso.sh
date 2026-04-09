@@ -123,10 +123,14 @@ fi
 # Phase 2: as root. mkarchiso needs root for chroot/mount/squashfs.
 # ---------------------------------------------------------------------------
 cleanup() {
-    # Unmount any lingering bind mounts from a failed build
+    # Unmount any lingering bind mounts from a failed build. We do the
+    # prefix match in awk (not `grep "^$WORK_DIR"`) so that regex
+    # metacharacters in the path — dots, plusses, brackets — are treated
+    # as literals. The trailing slash on the prefix prevents matching a
+    # sibling directory whose name happens to start with WORK_DIR.
     while IFS= read -r mp; do
         umount -l "$mp" 2>/dev/null || true
-    done < <(awk '{print $2}' /proc/mounts | grep "^${WORK_DIR}" | sort -r)
+    done < <(awk -v wd="${WORK_DIR}/" 'index($2, wd) == 1 { print $2 }' /proc/mounts | sort -r)
     # Return ownership of build artifacts to the invoking user so they can
     # be inspected, moved, or deleted without sudo. Runs on every exit path
     # (success or failure) so partial builds aren't stranded as root.
@@ -185,6 +189,36 @@ rm -f "$PROFILE_DIR/airootfs/etc/mkinitcpio.d/linux.preset"
 
 echo "==> Building claude-rescue ISO..."
 mkarchiso -v -w "$WORK_DIR" -o "$OUT_DIR" "$PROFILE_DIR"
+
+# ---------------------------------------------------------------------------
+# Post-build sanity check: confirm the claude binary actually landed inside
+# the assembled airootfs squashfs.
+#
+# Why this exists: we install claude via the deprecated `customize_airootfs.sh`
+# hook (see overlay/airootfs/root/customize_airootfs.sh). If a future archiso
+# release silently stops calling that hook, mkarchiso will still exit 0 and
+# produce an ISO — but the ISO will boot to a launcher that errors out at
+# runtime saying claude is missing. We'd rather fail loudly here at build
+# time than ship a broken rescue image.
+#
+# unsquashfs is part of squashfs-tools, which is a hard dependency of archiso,
+# so it is guaranteed to be present whenever this script can run.
+# ---------------------------------------------------------------------------
+echo "==> Verifying claude binary is present in airootfs squashfs..."
+SQUASHFS=$(find "$WORK_DIR" -type f -name 'airootfs.sfs' 2>/dev/null | head -1)
+if [[ -z "$SQUASHFS" ]]; then
+    echo "  error: airootfs.sfs not found under $WORK_DIR after mkarchiso." >&2
+    echo "         archiso may have changed its work-tree layout — update this check." >&2
+    exit 1
+fi
+if ! unsquashfs -l "$SQUASHFS" 2>/dev/null | grep -qE '/(usr/bin|usr/local/bin)/claude$'; then
+    echo "  error: claude binary not found inside $SQUASHFS." >&2
+    echo "         Either the customize_airootfs.sh hook did not run (archiso may" >&2
+    echo "         have removed the deprecated mechanism), or the npm install inside" >&2
+    echo "         the chroot failed silently. Check the mkarchiso output above." >&2
+    exit 1
+fi
+echo "==> claude binary present in squashfs."
 
 echo ""
 echo "==> Build complete. ISO available in $OUT_DIR/"

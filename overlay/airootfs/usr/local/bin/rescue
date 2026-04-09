@@ -31,6 +31,13 @@ network_setup() {
 }
 
 drop_to_shell() {
+    # `exec zsh` (vs. running zsh as a subshell and resuming the menu loop
+    # on its exit) is intentional. The launcher is invoked from .zlogin on
+    # autologin tty1, so it IS the user's session — keeping a parent menu
+    # process around just to wait for the shell to exit wastes the slot and
+    # makes Ctrl+D in the shell feel laggy. Re-entering the menu is one
+    # command away: the printed hint primes the user to type `rescue`,
+    # which re-execs this script.
     clear
     echo "Type 'rescue' to return to the menu."
     exec zsh
