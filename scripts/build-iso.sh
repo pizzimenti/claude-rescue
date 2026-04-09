@@ -122,15 +122,19 @@ fi
 # ---------------------------------------------------------------------------
 # Phase 2: as root. mkarchiso needs root for chroot/mount/squashfs.
 # ---------------------------------------------------------------------------
-cleanup() {
-    # Unmount any lingering bind mounts from a failed build. We do the
-    # prefix match in awk (not `grep "^$WORK_DIR"`) so that regex
+unmount_workdir() {
+    # Unmount any lingering bind mounts under WORK_DIR from a failed build.
+    # We do the prefix match in awk (not `grep "^$WORK_DIR"`) so that regex
     # metacharacters in the path — dots, plusses, brackets — are treated
     # as literals. The trailing slash on the prefix prevents matching a
     # sibling directory whose name happens to start with WORK_DIR.
     while IFS= read -r mp; do
         umount -l "$mp" 2>/dev/null || true
     done < <(awk -v wd="${WORK_DIR}/" 'index($2, wd) == 1 { print $2 }' /proc/mounts | sort -r)
+}
+
+cleanup() {
+    unmount_workdir
     # Return ownership of build artifacts to the invoking user so they can
     # be inspected, moved, or deleted without sudo. Runs on every exit path
     # (success or failure) so partial builds aren't stranded as root.
@@ -144,6 +148,13 @@ trap cleanup EXIT
 # steps. If a previous build was killed mid-run, those stamps cause a
 # subsequent invocation to no-op ("Validating options... Done!") even though
 # nothing was actually produced. Wipe and recreate for a clean build.
+#
+# Critical: unmount any stale bind mounts BEFORE the recursive remove.
+# A previous mkarchiso run that died mid-build can leave proc/sys/dev bind
+# mounts live under $WORK_DIR; without this, `rm -rf` would walk into them
+# and start deleting from the host's /proc, /sys, /dev. The EXIT trap alone
+# is not enough — it only fires when this script exits, not before the wipe.
+unmount_workdir
 rm -rf "$WORK_DIR"
 mkdir -p "$WORK_DIR" "$OUT_DIR"
 touch "$WORK_DIR/.noindex" "$OUT_DIR/.noindex"
