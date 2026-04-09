@@ -11,10 +11,13 @@ Claude Code for AI-assisted repair. A field-repair appliance, not a desktop dist
 
 # Test in QEMU
 ./scripts/run-qemu-test.sh
-
-# Write to USB
-sudo ./scripts/prepare-usb.sh /dev/sdX
 ```
+
+Write the resulting `out/claude-rescue-*.iso` to a USB stick with whatever
+tool you prefer — `dd`, [Ventoy](https://www.ventoy.net/),
+[balenaEtcher](https://etcher.balena.io/), Fedora Media Writer, Rufus,
+etc. The image is a hybrid ISO. See [docs/build.md](docs/build.md) for
+notes.
 
 ## Architecture
 

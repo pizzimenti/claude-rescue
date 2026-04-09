@@ -1,0 +1,12 @@
+{
+  "hasCompletedOnboarding": true,
+  "lastOnboardingVersion": "2.1.97",
+  "bypassPermissionsModeAccepted": true,
+  "projects": {
+    "/root": {
+      "hasTrustDialogAccepted": true,
+      "hasClaudeMdExternalIncludesApproved": true,
+      "hasClaudeMdExternalIncludesWarningShown": true
+    }
+  }
+}

@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# claude-rescue launcher
+
+TITLE="Claude Rescue"
+
+# Check if dialog is available
+if ! command -v dialog &>/dev/null; then
+    echo "error: dialog not found" >&2
+    exec zsh
+fi
+
+launch_claude() {
+    # Claude Code is installed at build time via
+    # overlay/airootfs/root/customize_airootfs.sh, so this should never
+    # be missing on a correctly built ISO. If it is, that means the
+    # build's customize_airootfs hook silently failed (or someone
+    # uninstalled it at runtime) — surface a clear error rather than
+    # offering a network-dependent runtime install.
+    if ! command -v claude >/dev/null 2>&1; then
+        dialog --title "$TITLE" --msgbox \
+            "Claude Code is missing from this rescue image.\n\nThis is a build defect — please rebuild the ISO." \
+            8 55
+        return
+    fi
+    clear
+    claude
+}
+
+network_setup() {
+    nmtui
+}
+
+drop_to_shell() {
+    # `exec zsh` (vs. running zsh as a subshell and resuming the menu loop
+    # on its exit) is intentional. The launcher is invoked from .zlogin on
+    # autologin tty1, so it IS the user's session — keeping a parent menu
+    # process around just to wait for the shell to exit wastes the slot and
+    # makes Ctrl+D in the shell feel laggy. Re-entering the menu is one
+    # command away: the printed hint primes the user to type `rescue`,
+    # which re-execs this script.
+    clear
+    echo "Type 'rescue' to return to the menu."
+    exec zsh
+}
+
+while true; do
+    choice=$(dialog --stdout \
+        --title "$TITLE" \
+        --cancel-label "Quit" \
+        --menu "Select an action:" 12 50 3 \
+        1 "Launch Claude Code" \
+        2 "Network Setup" \
+        3 "Shell")
+
+    case $? in
+        1|255) # Cancel or Esc
+            dialog --title "$TITLE" --yesno "Exit to shell?" 6 35
+            [[ $? -eq 0 ]] && drop_to_shell
+            continue
+            ;;
+    esac
+
+    case "$choice" in
+        1) launch_claude ;;
+        2) network_setup ;;
+        3) drop_to_shell ;;
+    esac
+done
