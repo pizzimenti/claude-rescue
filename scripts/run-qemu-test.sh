@@ -41,6 +41,6 @@ exec qemu-system-x86_64 \
     -boot d \
     -netdev user,id=net0 \
     -device virtio-net-pci,netdev=net0 \
-    -serial file:serial.log \
+    -serial "file:$OUT_DIR/serial.log" \
     -display gtk \
     "$@"

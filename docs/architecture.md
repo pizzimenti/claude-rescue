@@ -10,8 +10,8 @@ modules.
 
 1. BIOS/UEFI → GRUB/syslinux → Linux kernel + initramfs
 2. systemd starts; getty@tty1 autologins as root
-3. zsh sources `/etc/zsh/zshrc`, then runs `/root/.zlogin`
-4. `.zlogin` shows the MOTD and launches `/usr/local/bin/rescue` (M2+)
+3. zsh sources `/etc/zsh/zshrc`, prints `/etc/motd`, then runs `/root/.zlogin`
+4. `.zlogin` launches `/usr/local/bin/rescue` (the dialog-based menu)
 
 ## Components
 
@@ -32,8 +32,13 @@ Optional ext4 partition labeled `RESCUE_PERSIST`. If present, `/persist` is moun
 and used for logs, config, and Claude session state. Gracefully absent if not found.
 
 ### Claude module (`runtime/claude/`)
-Installs Claude Code via npm on first boot (requires network). Session state stored
-in `/persist/claude` if persistence is available.
+Claude Code is installed at ISO build time via `customize_airootfs.sh`
+(pinned `@anthropic-ai/claude-code` version), so the `claude` binary is
+present on `$PATH` immediately after boot — no network round-trip required
+to launch the REPL. If credentials were embedded during the build, the
+launcher drops straight into Claude Code; otherwise it prompts for
+`ANTHROPIC_API_KEY`. Session state will be stored in `/persist/claude`
+once the persistence layer lands (M2+).
 
 ## Filesystem layout (live)
 
