@@ -1,0 +1,10 @@
+
+  ╔══════════════════════════════════════════════════╗
+  ║          Claude Rescue — Field Repair            ║
+  ║  AI-assisted Linux recovery environment          ║
+  ╚══════════════════════════════════════════════════╝
+
+  • Run 'rescue' to launch the interactive repair menu
+  • Run 'nmtui' to connect to Wi-Fi
+  • Run 'lsblk' to list storage devices
+

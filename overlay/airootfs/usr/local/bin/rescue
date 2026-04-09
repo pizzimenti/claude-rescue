@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# claude-rescue launcher
+
+TITLE="Claude Rescue"
+
+# Check if dialog is available
+if ! command -v dialog &>/dev/null; then
+    echo "error: dialog not found" >&2
+    exec zsh
+fi
+
+claude_installed() {
+    command -v claude &>/dev/null
+}
+
+network_up() {
+    nmcli -t -f STATE general status 2>/dev/null | grep -q '^connected'
+}
+
+install_claude() {
+    clear
+    echo "==> Installing Claude Code..."
+    echo ""
+    if ! network_up; then
+        dialog --title "$TITLE" --msgbox \
+            "No network connection.\n\nUse 'Network Setup' first, then try again." \
+            8 50
+        return 1
+    fi
+    npm install -g @anthropic-ai/claude-code
+    local rc=$?
+    if [[ $rc -eq 0 ]]; then
+        dialog --title "$TITLE" --msgbox "Claude Code installed successfully." 6 45
+    else
+        dialog --title "$TITLE" --msgbox "Installation failed (exit $rc).\nCheck network and try again." 7 50
+    fi
+    return $rc
+}
+
+launch_claude() {
+    if ! claude_installed; then
+        dialog --title "$TITLE" --yesno \
+            "Claude Code is not installed.\n\nInstall it now? (requires internet)" \
+            8 52
+        [[ $? -eq 0 ]] || return
+        install_claude || return
+    fi
+    clear
+    claude
+}
+
+network_setup() {
+    nmtui
+}
+
+drop_to_shell() {
+    clear
+    echo "Type 'rescue' to return to the menu."
+    exec zsh
+}
+
+while true; do
+    choice=$(dialog --stdout \
+        --title "$TITLE" \
+        --cancel-label "Quit" \
+        --menu "Select an action:" 12 50 3 \
+        1 "Launch Claude Code" \
+        2 "Network Setup" \
+        3 "Shell")
+
+    case $? in
+        1|255) # Cancel or Esc
+            dialog --title "$TITLE" --yesno "Exit to shell?" 6 35
+            [[ $? -eq 0 ]] && drop_to_shell
+            continue
+            ;;
+    esac
+
+    case "$choice" in
+        1) launch_claude ;;
+        2) network_setup ;;
+        3) drop_to_shell ;;
+    esac
+done
