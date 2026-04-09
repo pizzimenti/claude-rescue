@@ -29,11 +29,15 @@ Terminal: curses mode (no GUI window needed). Exit with `Ctrl-A X`.
 
 ## Writing to USB
 
-```bash
-sudo ./scripts/prepare-usb.sh /dev/sdX
-```
+The ISO is a hybrid image — write it to a USB stick with whichever tool
+you already trust. A few options:
 
-Confirms before writing. Uses `dd` with 4M block size and `oflag=sync`.
+- `sudo dd if=out/claude-rescue-*.iso of=/dev/sdX bs=4M status=progress conv=fsync`
+- [Ventoy](https://www.ventoy.net/) (drop the `.iso` onto a Ventoy USB)
+- [balenaEtcher](https://etcher.balena.io/) (cross-platform GUI)
+- [Fedora Media Writer](https://fedoraproject.org/workstation/download), Rufus, etc.
+
+Be sure `/dev/sdX` is the correct whole-disk device and not a partition.
 
 ## Clean rebuild
 

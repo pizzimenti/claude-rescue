@@ -54,10 +54,9 @@ Claude Code for AI-assisted repair. A field-repair appliance, not a desktop dist
    - `root/.zlogin` (placeholder launcher entry point)
 7. Create `scripts/build-iso.sh`
 8. Create `scripts/run-qemu-test.sh`
-9. Create `scripts/prepare-usb.sh`
-10. Write `README.md`, `docs/architecture.md`, `docs/decision-log.md`, `docs/build.md`
-11. Create empty scaffold dirs for M2+ (runtime/, systemd/, tests/, examples/, .github/)
-12. Build first ISO, verify boot in QEMU
+9. Write `README.md`, `docs/architecture.md`, `docs/decision-log.md`, `docs/build.md`
+10. Create empty scaffold dirs for M2+ (runtime/, systemd/, tests/, examples/, .github/)
+11. Build first ISO, verify boot in QEMU
 
 ## Target repo layout
 
@@ -95,7 +94,6 @@ claude-rescue/
 ├── scripts/
 │   ├── build-iso.sh
 │   ├── run-qemu-test.sh
-│   ├── prepare-usb.sh
 │   └── validate-config.sh
 ├── runtime/
 │   ├── launcher/
@@ -122,4 +120,7 @@ claude-rescue/
 2. `scripts/run-qemu-test.sh` boots the ISO in QEMU
 3. Boots to root shell with no login prompt (autologin)
 4. Recovery tools present: `cryptsetup`, `lvm2`, `nmcli`, `parted`, `btrfs-progs`, etc.
-5. Placeholder banner displays in `.zlogin`, drops to zsh
+5. MOTD displays the rescue banner; `rescue` launches the dialog menu
+6. `claude` is present on `$PATH` (baked in at build time, not fetched at boot)
+7. If a token was embedded, `Launch Claude Code` enters the REPL with no
+   onboarding prompt; otherwise it prompts for `ANTHROPIC_API_KEY`
