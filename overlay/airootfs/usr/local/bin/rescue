@@ -9,41 +9,18 @@ if ! command -v dialog &>/dev/null; then
     exec zsh
 fi
 
-claude_installed() {
-    command -v claude &>/dev/null
-}
-
-network_up() {
-    nmcli -t -f STATE general status 2>/dev/null | grep -q '^connected'
-}
-
-install_claude() {
-    clear
-    echo "==> Installing Claude Code..."
-    echo ""
-    if ! network_up; then
-        dialog --title "$TITLE" --msgbox \
-            "No network connection.\n\nUse 'Network Setup' first, then try again." \
-            8 50
-        return 1
-    fi
-    npm install -g @anthropic-ai/claude-code
-    local rc=$?
-    if [[ $rc -eq 0 ]]; then
-        dialog --title "$TITLE" --msgbox "Claude Code installed successfully." 6 45
-    else
-        dialog --title "$TITLE" --msgbox "Installation failed (exit $rc).\nCheck network and try again." 7 50
-    fi
-    return $rc
-}
-
 launch_claude() {
-    if ! claude_installed; then
-        dialog --title "$TITLE" --yesno \
-            "Claude Code is not installed.\n\nInstall it now? (requires internet)" \
-            8 52
-        [[ $? -eq 0 ]] || return
-        install_claude || return
+    # Claude Code is installed at build time via
+    # overlay/airootfs/root/customize_airootfs.sh, so this should never
+    # be missing on a correctly built ISO. If it is, that means the
+    # build's customize_airootfs hook silently failed (or someone
+    # uninstalled it at runtime) — surface a clear error rather than
+    # offering a network-dependent runtime install.
+    if ! command -v claude >/dev/null 2>&1; then
+        dialog --title "$TITLE" --msgbox \
+            "Claude Code is missing from this rescue image.\n\nThis is a build defect — please rebuild the ISO." \
+            8 55
+        return
     fi
     clear
     claude

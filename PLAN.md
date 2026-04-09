@@ -28,8 +28,8 @@ Claude Code for AI-assisted repair. A field-repair appliance, not a desktop dist
 
 | # | Name               | Status  |
 |---|--------------------|---------|
-| 1 | Foundation         | NEXT    |
-| 2 | Runtime skeleton   | pending |
+| 1 | Foundation         | DONE    |
+| 2 | Runtime skeleton   | NEXT    |
 | 3 | Networking         | pending |
 | 4 | Storage & repair   | pending |
 | 5 | Persistence        | pending |

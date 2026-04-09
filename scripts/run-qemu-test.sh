@@ -4,11 +4,23 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_DIR="$REPO_ROOT/out"
 
-ISO="$(ls -t "$OUT_DIR"/claude-rescue-*.iso 2>/dev/null | head -1)"
-if [[ -z "$ISO" ]]; then
+# Glob directly instead of parsing `ls` — handles spaces/newlines in paths
+# safely and avoids the shellcheck SC2012 footgun. nullglob makes the array
+# empty (rather than literal-glob) when there are no matches.
+shopt -s nullglob
+ISO_CANDIDATES=("$OUT_DIR"/claude-rescue-*.iso)
+shopt -u nullglob
+if (( ${#ISO_CANDIDATES[@]} == 0 )); then
     echo "error: no ISO found in $OUT_DIR — run scripts/build-iso.sh first" >&2
     exit 1
 fi
+# Pick the newest by mtime — same selection `ls -t | head -1` was doing.
+ISO=""
+for candidate in "${ISO_CANDIDATES[@]}"; do
+    if [[ -z "$ISO" || "$candidate" -nt "$ISO" ]]; then
+        ISO="$candidate"
+    fi
+done
 
 echo "==> Booting: $ISO"
 

@@ -65,9 +65,20 @@ if [[ $EUID -ne 0 ]]; then
             echo ""
             FRESH_HOME=$(mktemp -d)
             TOKEN_LOG=$(mktemp)
+            # Make sure the temp files (one of which holds the raw token
+            # text) are removed even if the user Ctrl+Cs in the middle of
+            # the OAuth flow. EXIT does NOT fire across `exec sudo` later,
+            # so we also clean up explicitly before elevating.
+            _phase1_cleanup() {
+                rm -rf "${FRESH_HOME:-}" "${TOKEN_LOG:-}" 2>/dev/null || true
+            }
+            trap _phase1_cleanup EXIT INT TERM HUP
             # Run interactively on the real user's tty. tee captures the
             # printed token without hiding the URL/prompts from the user.
-            HOME="$FRESH_HOME" claude setup-token 2>&1 | tee "$TOKEN_LOG"
+            # `|| true` keeps a setup-token failure (network down, browser
+            # not launching, user aborts the OAuth flow) from killing the
+            # whole build via `set -e` — token-embed is optional.
+            HOME="$FRESH_HOME" claude setup-token 2>&1 | tee "$TOKEN_LOG" || true
             # Claude prints the token wrapped across multiple lines, followed
             # by a blank line and "Store this token securely...". We must
             # respect the blank-line boundary — naive whitespace stripping
@@ -79,8 +90,11 @@ if [[ $EUID -ne 0 ]]; then
                 /^sk-ant-oat01-/ { capturing=1 }
                 capturing && NF==0 { exit }
                 capturing { gsub(/[[:space:]]/, ""); printf "%s", $0 }
-            ' "$TOKEN_LOG")
-            rm -rf "$FRESH_HOME" "$TOKEN_LOG"
+            ' "$TOKEN_LOG" 2>/dev/null || true)
+            # Eager cleanup — don't let the raw token sit in /tmp for the
+            # rest of the build, and don't leak it past the sudo boundary.
+            _phase1_cleanup
+            trap - EXIT INT TERM HUP
             TOKEN="${TOKEN//[[:space:]]/}"
             if [[ "$TOKEN" == sk-ant-oat01-* ]]; then
                 mkdir -p "$(dirname "$CLAUDE_TOKEN_FILE")"

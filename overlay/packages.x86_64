@@ -1,3 +1,16 @@
+# Package list — full-file overlay over the upstream releng packages.x86_64.
+# Re-diff against /usr/share/archiso/configs/releng/packages.x86_64 when
+# bumping the archiso package, to pick up new upstream additions.
+#
+# Networking note: NetworkManager is the *only* enabled networking unit on
+# the rescue ISO (see overlay/airootfs/etc/systemd/system/). dhcpcd, iwd,
+# and wpa_supplicant are intentionally retained because:
+#   - They are diagnostic / fallback CLI tools, not just daemons.
+#   - In a recovery scenario where NetworkManager is broken or you need to
+#     hand-bring an interface up, having them present (but not enabled) is
+#     the difference between fixing a system and being stuck.
+# They will not race NetworkManager because their .service units are not
+# linked into multi-user.target.wants.
 alsa-utils
 amd-ucode
 arch-install-scripts

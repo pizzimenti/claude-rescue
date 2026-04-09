@@ -1,4 +1,7 @@
-# mkinitcpio preset file for the 'linux' package on archiso
+# mkinitcpio preset file for the 'linux-lts' package on archiso
+# We swap to linux-lts in packages.x86_64 because the rescue ISO targets
+# a wide range of (often older) hardware where the LTS kernel is more
+# likely to have stable drivers than mainline.
 
 PRESETS=('archiso')
 
