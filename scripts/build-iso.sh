@@ -98,8 +98,16 @@ if [[ $EUID -ne 0 ]]; then
             TOKEN="${TOKEN//[[:space:]]/}"
             if [[ "$TOKEN" == sk-ant-oat01-* ]]; then
                 mkdir -p "$(dirname "$CLAUDE_TOKEN_FILE")"
-                echo "export CLAUDE_CODE_OAUTH_TOKEN=$TOKEN" > "$CLAUDE_TOKEN_FILE"
-                chmod 600 "$CLAUDE_TOKEN_FILE"
+                # Create the token file restricted from the first write.
+                # `echo > file; chmod 600` leaves a ~microsecond window where
+                # the file exists at mode 0644 (default umask 022) — long
+                # enough that another local user racing `cat` could grab a
+                # 1-year credential. umask 077 in a subshell makes the
+                # initial creation 0600 atomically.
+                (
+                    umask 077
+                    printf 'export CLAUDE_CODE_OAUTH_TOKEN=%s\n' "$TOKEN" > "$CLAUDE_TOKEN_FILE"
+                )
                 echo "==> Token embedded. Valid for 1 year."
             elif [[ -n "$TOKEN" ]]; then
                 echo "  warn: Token format not recognised (expected sk-ant-oat01-...). Skipping."
