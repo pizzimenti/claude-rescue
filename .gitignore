@@ -1,0 +1,29 @@
+# Build outputs
+work/
+out/
+*.iso
+
+# Test artifacts
+serial.log
+*.log
+
+# Secrets — embedded credentials, never commit
+archiso/airootfs/etc/profile.d/claude-token.sh
+
+# Claude Code state for the embedded rescue user (pre-baked .claude.json
+# IS tracked; runtime state under .claude/ is not)
+archiso/airootfs/root/.claude/
+
+# Claude Code state for *this* dev project (anchored to repo root so it
+# doesn't shadow the rescue ISO's pre-baked .claude.json)
+/.claude/
+/.claude.json
+
+# Editor / OS junk
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
