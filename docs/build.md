@@ -39,6 +39,52 @@ you already trust. A few options:
 
 Be sure `/dev/sdX` is the correct whole-disk device and not a partition.
 
+## Adding a persistence partition (RESCUE_PERSIST)
+
+The rescue system mounts any ext4 partition labeled `RESCUE_PERSIST` at
+`/persist` and uses it to store durable state — most notably, Claude
+Code's conversation history, so repair sessions resume across reboots.
+Without a `RESCUE_PERSIST` partition the system still boots and Claude
+still runs; conversations just live on tmpfs and are lost at the next
+reboot.
+
+The simplest way to add persistence, assuming you've already written the
+ISO to a USB stick with `dd` or a similar tool, is to create a second
+partition in the free space at the end of the stick:
+
+```bash
+# Identify the stick (example: /dev/sdX — replace with yours)
+lsblk
+
+# Find where the ISO ends and free space begins. parted will print the
+# free regions explicitly.
+sudo parted /dev/sdX unit MiB print free
+#   → look for a "Free Space" row near the end of the disk and note its
+#     Start value (e.g. 1538MiB).
+
+# Add a new partition spanning from there to the end of the disk.
+# Replace 1538MiB below with the actual Start value from the previous
+# command. (Or use gdisk / cfdisk interactively if you prefer a TUI.)
+sudo parted /dev/sdX mkpart primary ext4 1538MiB 100%
+
+# Format and label. The exact partition number depends on what was
+# already on the stick — check `lsblk` output or `parted print` to
+# confirm whether the new partition is sdX2, sdX3, etc.
+sudo mkfs.ext4 -L RESCUE_PERSIST /dev/sdX3
+
+# Verify
+sudo blkid /dev/sdX3
+# → /dev/sdX3: LABEL="RESCUE_PERSIST" TYPE="ext4" ...
+```
+
+Ventoy users can either create the partition on the Ventoy stick's free
+space, or format a separate stick as a single ext4 partition labeled
+`RESCUE_PERSIST` and plug both in.
+
+On the next boot of the rescue ISO, `mountpoint /persist` should report
+success and conversation history will begin accumulating under
+`/persist/claude/projects/`.
+
 ## Clean rebuild
 
 ```bash
