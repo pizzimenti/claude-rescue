@@ -191,3 +191,47 @@ and run claude directly (outside the launcher) will miss the context —
 acceptable, because they can re-orient Claude manually, and arguably the
 target machine's own CLAUDE.md (if any) should take precedence in that
 context anyway.
+
+---
+
+## Boot menu rebrand (0.2.1)
+
+**Decision:** Replace the upstream archiso boot-menu branding (Arch
+Linux logo, "Arch Linux install medium" titles) with Claude Rescue
+identity. Custom 640×480 splash PNG for syslinux/BIOS; rebranded entry
+titles plus tighter `loader.conf` for systemd-boot/UEFI. Remove
+`overlay/grub/` since GRUB isn't in the boot path.
+
+**Rationale:**
+- The boot menu is the first thing the user sees. Shipping with
+  upstream Arch branding made the rescue ISO feel like a generic Arch
+  install medium rather than a purpose-built tool — a small but real
+  hit to "is this the right thing I just booted?" confidence.
+- Removing dead `overlay/grub/` (verified unreferenced — `profiledef.sh`
+  only enables `bios.syslinux` and `uefi.systemd-boot`) clarifies that
+  GRUB isn't a maintained boot path here, so reviewers don't waste time
+  reasoning about it.
+
+**Asymmetry trade-off accepted:** syslinux supports a graphical splash
+(via `vesamenu.c32` and a 640×480 PNG background); systemd-boot does
+not — it's a plain text terminal with no banner mechanism. So BIOS
+users get the full visual identity, UEFI users get rebranded entry
+titles only. Building a parallel ASCII-art experience for systemd-boot
+would have minimal payoff (UEFI boot is fast; most users barely see
+the menu) and limited mechanism (no pre-menu output is supported).
+
+**Pipeline:** the high-resolution master lives at
+`assets/boot-screen/splash-master.png`; `scripts/render-splash.sh`
+resizes it to the 640×480 target and writes
+`overlay/syslinux/splash.png`, which is committed so the build itself
+doesn't need ImageMagick. Re-run the script when the master changes.
+
+**Why 640×480 and not higher:** vesamenu can use 800×600 / 1024×768
+modes via `MENU RESOLUTION`, but 640×480 is the only VBE mode that's
+universally supported on every BIOS we might encounter. This is a
+rescue tool — it has to boot on whatever obscure or ancient hardware
+the user pulls out of a closet — so we trade fidelity for compatibility.
+
+**Color palette:** menu chrome (`MENU COLOR`) shifted to green/amber to
+match the splash's phosphor aesthetic. The default vesamenu palette is
+white-on-blue, which clashed visibly with the green splash background.
