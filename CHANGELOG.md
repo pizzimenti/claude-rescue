@@ -4,6 +4,54 @@ All notable changes to Claude Rescue are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] - 2026-04-26
+
+Cosmetic-only release. Rebrand the BIOS and UEFI boot menus with a
+Claude Rescue visual identity instead of inheriting upstream archiso
+branding.
+
+### Added
+
+- Custom BIOS boot splash at `overlay/syslinux/splash.png` —
+  green-on-black CRT-phosphor wordmark with amber accents and a
+  toolbox illustration. Rendered from the high-resolution master at
+  `assets/boot-screen/splash-master.png` via the new
+  `scripts/render-splash.sh` (run on demand; the build itself doesn't
+  invoke ImageMagick).
+- `overlay/efiboot/loader/loader.conf` — overrides upstream archiso's
+  default with `timeout 10` (down from 15) and `console-mode max`
+  (legible menus on HiDPI UEFI laptops).
+- New "Boot menu rebrand" entry in `docs/decision-log.md` covering the
+  asymmetric BIOS-vs-UEFI experience and the 640×480 / VBE mode
+  trade-off.
+
+### Changed
+
+- `overlay/syslinux/archiso_head.cfg` — overrides upstream with the
+  rebranded layout: no `MENU TITLE` (the splash already carries the
+  title), VSHIFT/ROWS/HELPMSGROW tuned to fit the splash's reserved
+  middle band, color palette shifted to green/amber to match.
+- BIOS boot entries (`overlay/syslinux/archiso_sys-linux.cfg`,
+  `overlay/syslinux/archiso_pxe-linux.cfg`) — labels changed from
+  "Arch Linux install medium (...)" to "Boot Claude Rescue (...)".
+- UEFI boot entry (`overlay/efiboot/loader/entries/01-archiso-linux.conf`)
+  — same rebrand on the title.
+- `docs/architecture.md` — new "Boot menu" section documenting the
+  syslinux + systemd-boot setup and the GRUB removal.
+
+### Removed
+
+- `overlay/grub/` — GRUB isn't in the boot path (`profiledef.sh` only
+  enables `bios.syslinux` and `uefi.systemd-boot`), so the directory
+  was dead weight.
+- The accessibility/speakup boot variant (BIOS `archspeech` label and
+  UEFI `02-archiso-speech-linux.conf`). Upstream archiso ships a
+  parallel speech-enabled entry on every boot path; we drop it for a
+  cleaner single-entry rescue menu. `scripts/build-iso.sh` removes
+  the upstream UEFI speech entry from the assembled profile (the
+  syslinux side is handled by our overriding `archiso_sys-linux.cfg`
+  not including the `archspeech` LABEL).
+
 ## [0.2.0] - 2026-04-26
 
 The "ergonomics" release. Built on top of the v0.1.0 bootable foundation
@@ -114,5 +162,6 @@ was merged.
 - Initial `docs/architecture.md`, `docs/decision-log.md`,
   `docs/build.md`, `README.md`, `PLAN.md`.
 
+[0.2.1]: https://github.com/pizzimenti/claude-rescue/releases/tag/v0.2.1
 [0.2.0]: https://github.com/pizzimenti/claude-rescue/releases/tag/v0.2.0
 [0.1.0]: https://github.com/pizzimenti/claude-rescue/releases/tag/v0.1.0

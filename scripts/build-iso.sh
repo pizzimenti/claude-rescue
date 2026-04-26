@@ -274,6 +274,16 @@ cp -af "$OVERLAY_DIR/." "$PROFILE_DIR"
 # break mkinitcpio. Our linux-lts.preset replaces it.
 rm -f "$PROFILE_DIR/airootfs/etc/mkinitcpio.d/linux.preset"
 
+# We deliberately ship a single "Boot Claude Rescue" entry on UEFI — no
+# parallel speakup/accessibility variant. The upstream releng profile
+# includes 02-archiso-speech-linux.conf in efiboot/loader/entries/; if we
+# don't strip it, it'd land in the systemd-boot menu via the cp -af above
+# and contradict the single-entry design we shipped in v0.2.1. (The
+# syslinux/BIOS side handles this differently — our archiso_sys-linux.cfg
+# fully replaces upstream's, and we just don't include the archspeech
+# LABEL.)
+rm -f "$PROFILE_DIR/efiboot/loader/entries/02-archiso-speech-linux.conf"
+
 echo "==> Building claude-rescue ISO..."
 mkarchiso -v -w "$WORK_DIR" -o "$OUT_DIR" "$PROFILE_DIR"
 

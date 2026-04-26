@@ -104,6 +104,33 @@ environment it's in (rescue ISO, not a dev box), which paths matter
 (`/mnt` = target, `/persist` = durable, everything else = tmpfs), and
 what recovery tools are already on the box.
 
+### Boot menu (`overlay/syslinux/`, `overlay/efiboot/`)
+The ISO boots BIOS systems via syslinux (with the `vesamenu.c32` graphical
+menu) and UEFI systems via systemd-boot. Both menus are rebranded to
+"Boot Claude Rescue" rather than the upstream archiso "Arch Linux install
+medium" wording.
+
+The BIOS menu uses a custom 640×480 splash PNG at
+`overlay/syslinux/splash.png`, generated from a higher-resolution master
+in `assets/boot-screen/splash-master.png` via `scripts/render-splash.sh`.
+The splash carries the visual identity (CRT-phosphor green-on-black with
+amber accents); `archiso_head.cfg` is sized so the menu items, help text,
+and tab message overlay onto the empty middle band of the splash without
+clashing with the wordmark above or the footer text below. There's no
+`MENU TITLE` directive — the splash already shows the title and adding a
+vesamenu title bar over it would be redundant noise.
+
+The UEFI menu (systemd-boot) has no splash or banner mechanism — it's a
+plain text terminal — so UEFI users see a flatter experience: just the
+boot entries with rebranded titles. `loader.conf` is overridden to set
+`console-mode max` so the menu renders at native resolution on HiDPI
+laptops, and `timeout 10` (down from upstream's 15) since rescue users
+typically know what they're booting.
+
+GRUB is not used as a boot path on this ISO. `overlay/grub/` was removed
+in v0.2.1 — `profiledef.sh` only enables `bios.syslinux` and
+`uefi.systemd-boot`, so the directory was dead weight.
+
 ## Filesystem layout (live)
 
 ```
