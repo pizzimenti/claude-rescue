@@ -56,12 +56,20 @@ partition in the free space at the end of the stick:
 # Identify the stick (example: /dev/sdX — replace with yours)
 lsblk
 
-# Add a new partition after the ISO. On a dd-written hybrid ISO the
-# partition table has two small partitions already; add a third one.
-sudo parted /dev/sdX mkpart primary ext4 100% 100%   # adjust start as needed
-# (Or use gdisk / cfdisk interactively — pick whatever you're comfortable with.)
+# Find where the ISO ends and free space begins. parted will print the
+# free regions explicitly.
+sudo parted /dev/sdX unit MiB print free
+#   → look for a "Free Space" row near the end of the disk and note its
+#     Start value (e.g. 1538MiB).
 
-# Format and label
+# Add a new partition spanning from there to the end of the disk.
+# Replace 1538MiB below with the actual Start value from the previous
+# command. (Or use gdisk / cfdisk interactively if you prefer a TUI.)
+sudo parted /dev/sdX mkpart primary ext4 1538MiB 100%
+
+# Format and label. The exact partition number depends on what was
+# already on the stick — check `lsblk` output or `parted print` to
+# confirm whether the new partition is sdX2, sdX3, etc.
 sudo mkfs.ext4 -L RESCUE_PERSIST /dev/sdX3
 
 # Verify
