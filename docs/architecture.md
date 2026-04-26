@@ -83,10 +83,19 @@ partition is present: the `claude-persist.service` oneshot symlinks
 `/root/.claude/projects` → `/persist/claude/projects` after `persist.mount`
 succeeds. Only the `projects/` subtree is redirected — the rest of
 `/root/.claude/` (settings, cache, backups) stays ephemeral, and the
-installer's binary bundle lives entirely outside `.claude/` anyway. If
-no persistence partition is present, `claude-persist.service` simply
-doesn't run (it `Requires=persist.mount`) and conversations are
-tmpfs-only.
+installer's binary bundle lives entirely outside `.claude/` anyway.
+
+Gating relies on two complementary systemd directives. `BindsTo=persist.mount`
+ties the service's lifecycle to the mount: if the mount stops (or, more
+importantly, was condition-skipped because there's no RESCUE_PERSIST
+partition), this service is also skipped. We use `BindsTo=` rather than
+the more obvious `Requires=` because per systemd.unit(5), a
+condition-skipped unit is treated as "successfully" inactive for
+`Requires=` purposes — a `Requires=` dependent runs anyway. `BindsTo=`
+treats it as inactive and skips. As a belt-and-suspenders check the
+service also has `ConditionPathIsMountPoint=/persist`, so it refuses to
+run unless `/persist` is a real mountpoint (not a tmpfs directory). On
+machines without a persistence partition, conversations are tmpfs-only.
 
 A `CLAUDE.md` at `/root/CLAUDE.md` ships in the squashfs and is loaded
 automatically as the project-local instructions file when the launcher

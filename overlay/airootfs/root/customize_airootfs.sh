@@ -77,7 +77,17 @@ fi
 # `claude --version` output has varied across releases (e.g. bare "2.1.97",
 # "2.1.97 (Claude Code)", etc.), so extract the first semver-shaped token
 # rather than assuming a field position.
-CLAUDE_VERSION=$("$CLAUDE_BIN" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+#
+# We capture --version output to a variable first, then awk-extract from
+# the variable. The seemingly-equivalent `claude --version | grep -oE
+# ... | head -1` reintroduces the same SIGPIPE+pipefail race we fixed in
+# build-iso.sh's post-build squashfs check: head -1 closes stdin on the
+# first match -> grep gets SIGPIPE on its next write -> exits 141 ->
+# pipefail propagates 141 as the substitution's status -> set -e kills
+# the build. A future Claude release that prints multiple semver-like
+# tokens would silently break ISO builds.
+_version_output=$("$CLAUDE_BIN" --version 2>/dev/null || true)
+CLAUDE_VERSION=$(awk 'match($0,/[0-9]+\.[0-9]+\.[0-9]+/){print substr($0,RSTART,RLENGTH);exit}' <<<"$_version_output")
 if [[ -z "$CLAUDE_VERSION" ]]; then
     echo "  error: could not determine claude version from \`claude --version\`" >&2
     exit 1

@@ -100,10 +100,20 @@ if [[ $EUID -ne 0 ]]; then
                         # Truncating to `flatpak` alone makes BROWSER
                         # unrunnable. xdg-open honors multi-word
                         # $BROWSER values via shell word-splitting.
+                        # Constrain to [Desktop Entry] section: per the
+                        # Desktop Entry Specification, .desktop files can
+                        # contain [Desktop Action *] subsections (right-
+                        # click menu items like "New Window") that each
+                        # have their own Exec=. Browsers ship [Desktop
+                        # Entry] first by convention so the bug rarely
+                        # bites, but constraining the match is cheap
+                        # insurance. Also convert literal %% to % per spec.
                         _exec=$(awk '
-                            /^Exec=/ {
+                            /^\[/ { in_entry = ($0 == "[Desktop Entry]") }
+                            in_entry && /^Exec=/ {
                                 sub(/^Exec=/, "")
                                 gsub(/%[a-zA-Z]/, "")
+                                gsub(/%%/, "%")
                                 gsub(/[[:space:]]+/, " ")
                                 sub(/^[[:space:]]+/, "")
                                 sub(/[[:space:]]+$/, "")

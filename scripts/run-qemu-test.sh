@@ -70,34 +70,60 @@ if (( USE_PERSIST == 1 )); then
             echo "  error: qemu-img not found (install 'qemu-img' or 'qemu-full')" >&2
             exit 1
         fi
+        # Idempotent retry: clear any stray .raw from a prior aborted run.
+        # Then arm an ERR trap so a failure anywhere in the create/format/
+        # convert sequence wipes both the .raw and any partial qcow2 — a
+        # subsequent invocation re-enters this block cleanly instead of
+        # erroring on `qemu-img create` because the .raw already exists.
+        rm -f "$PERSIST_IMG.raw"
+        trap 'rm -f "$PERSIST_IMG.raw" "$PERSIST_IMG"' ERR
         qemu-img create -f raw "$PERSIST_IMG.raw" "$PERSIST_SIZE" >/dev/null
 
+        # `_mkfs_done` tracks whether some path successfully formatted the
+        # raw image. We try guestfish first (real partition table, more
+        # faithful to a USB stick) then fall back to bare mkfs.ext4.
+        # Critically we treat guestfish *runtime* failure (not just absence)
+        # as a fall-through trigger — libguestfs can be installed but
+        # broken on hosts where the appliance kernel can't run (containers,
+        # restrictive sandboxes, missing /dev/kvm permissions).
+        _mkfs_done=0
         if command -v guestfish &>/dev/null; then
             # Unprivileged path via libguestfs. `part-disk` creates one
             # partition spanning the disk, `mkfs-opts` passes the label to
             # mke2fs so blkid reports RESCUE_PERSIST.
-            guestfish --rw -a "$PERSIST_IMG.raw" <<'GUESTFISH'
+            if guestfish --rw -a "$PERSIST_IMG.raw" <<'GUESTFISH'
 run
 part-disk /dev/sda mbr
 mkfs-opts ext4 /dev/sda1 blocksize:4096 label:RESCUE_PERSIST
 GUESTFISH
-        elif command -v mkfs.ext4 &>/dev/null; then
-            # Fall back to mkfs.ext4 directly on the raw image, no
-            # partition table. This still produces a labeled filesystem
-            # that blkid/udev exposes via /dev/disk/by-label, and QEMU
-            # presents the whole "disk" as a single filesystem. Simpler
-            # and needs no root.
-            mkfs.ext4 -q -L RESCUE_PERSIST "$PERSIST_IMG.raw"
-        else
-            echo "  error: need either 'guestfish' (libguestfs) or 'mkfs.ext4'" >&2
-            echo "         to initialize the persist disk. Install one of:" >&2
-            echo "           sudo pacman -S libguestfs" >&2
-            echo "           sudo pacman -S e2fsprogs   # usually already present" >&2
-            exit 1
+            then
+                _mkfs_done=1
+            else
+                echo "  warn: guestfish failed at runtime; falling back to mkfs.ext4..." >&2
+                # guestfish may have partially modified the image — start fresh.
+                rm -f "$PERSIST_IMG.raw"
+                qemu-img create -f raw "$PERSIST_IMG.raw" "$PERSIST_SIZE" >/dev/null
+            fi
+        fi
+
+        if (( _mkfs_done == 0 )); then
+            if command -v mkfs.ext4 &>/dev/null; then
+                # Bare ext4 directly on the raw image, no partition table.
+                # udev still exposes the label via /dev/disk/by-label, so
+                # persist.mount resolves correctly inside the guest.
+                mkfs.ext4 -q -L RESCUE_PERSIST "$PERSIST_IMG.raw"
+            else
+                echo "  error: need either 'guestfish' (libguestfs) or 'mkfs.ext4'" >&2
+                echo "         to initialize the persist disk. Install one of:" >&2
+                echo "           sudo pacman -S libguestfs" >&2
+                echo "           sudo pacman -S e2fsprogs   # usually already present" >&2
+                exit 1
+            fi
         fi
 
         qemu-img convert -f raw -O qcow2 "$PERSIST_IMG.raw" "$PERSIST_IMG"
         rm -f "$PERSIST_IMG.raw"
+        trap - ERR
         echo "==> Persistent disk created. Delete $PERSIST_IMG to reset state."
     else
         echo "==> Reusing persistent disk: $PERSIST_IMG"

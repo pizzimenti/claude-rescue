@@ -1,13 +1,23 @@
 [Unit]
 Description=Redirect Claude Code conversation history to /persist
 Documentation=https://github.com/pizzimenti/claude-rescue
-# Requires+After persist.mount means this unit only runs when /persist
-# actually mounted successfully. On machines without a RESCUE_PERSIST
-# partition, persist.mount is skipped (ConditionPathExists in that unit),
-# which propagates here as "unit not started" — silent graceful fallback
-# to the default tmpfs-backed /root/.claude/projects.
-Requires=persist.mount
+# Only run when /persist is actually mounted. Two complementary guards:
+#
+# - BindsTo=persist.mount ties our lifecycle to the mount: if persist.mount
+#   stops (or never starts), this unit stops. Critically, BindsTo treats
+#   condition-skipped units as inactive — Requires= would NOT, because
+#   systemd considers a condition-skipped target "successfully" inactive
+#   for Requires= purposes (per systemd.unit(5)) and runs the dependent
+#   anyway. With Requires= we'd silently write the symlink into an
+#   ephemeral tmpfs /persist on machines without RESCUE_PERSIST, which
+#   would look like persistence but lose every conversation on reboot.
+#
+# - ConditionPathIsMountPoint=/persist is a belt-and-suspenders explicit
+#   check: only run if /persist is a real mountpoint, not just a tmpfs
+#   directory.
+BindsTo=persist.mount
 After=persist.mount
+ConditionPathIsMountPoint=/persist
 Before=getty@tty1.service
 
 [Service]
