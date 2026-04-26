@@ -23,6 +23,14 @@ launch_claude() {
         return
     fi
     clear
+    # Plain `claude` — no --dangerously-skip-permissions flag. Recent
+    # Claude Code refuses that flag when euid is 0 as a safety backstop,
+    # and the rescue ISO autologins as root unconditionally, so passing
+    # the flag breaks launch entirely. Per-tool approval prompts are the
+    # accepted trade-off. (The pre-baked .claude.json still carries
+    # `bypassPermissionsModeAccepted: true` — harmless when unused, and
+    # preserved so a user who manually drops to non-root and opts in
+    # doesn't hit the first-run acceptance dialog.)
     claude
 }
 

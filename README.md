@@ -21,14 +21,15 @@ notes.
 
 ## Architecture
 
-| Concern     | Choice                      |
-|-------------|-----------------------------|
-| Base distro | Arch Linux + archiso        |
-| Launcher UX | bash + dialog (ncurses TUI) |
-| Networking  | NetworkManager              |
-| Persistence | Labeled ext4 (RESCUE_PERSIST) |
-| Boot/login  | Root autologin → launcher   |
-| Shell       | zsh + tmux                  |
+| Concern      | Choice                                                  |
+|--------------|---------------------------------------------------------|
+| Base distro  | Arch Linux + archiso                                    |
+| Launcher UX  | bash + dialog (ncurses TUI)                             |
+| Networking   | NetworkManager                                          |
+| Persistence  | Labeled ext4 (RESCUE_PERSIST) → `/persist`, graceful if absent |
+| Boot/login   | Root autologin → launcher                               |
+| Claude Code  | Native installer; conversations persist via `/persist`  |
+| Shell        | zsh + tmux                                              |
 
 See [docs/architecture.md](docs/architecture.md) for full details.
 

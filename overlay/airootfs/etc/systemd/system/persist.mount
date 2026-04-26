@@ -1,0 +1,22 @@
+[Unit]
+Description=Mount RESCUE_PERSIST persistence partition
+# Only attempt the mount if the labeled device actually exists. Without
+# this guard, systemd logs a failure on every boot where the user hasn't
+# formatted a RESCUE_PERSIST partition — noisy and misleading since the
+# rescue ISO is designed to degrade gracefully without persistence.
+ConditionPathExists=/dev/disk/by-label/RESCUE_PERSIST
+DefaultDependencies=no
+Before=local-fs.target
+After=systemd-fsck@dev-disk-by\x2dlabel-RESCUE_PERSIST.service
+
+[Mount]
+What=/dev/disk/by-label/RESCUE_PERSIST
+Where=/persist
+Type=ext4
+# nofail: if the mount fails anyway (e.g. filesystem corruption), don't
+# block boot. The rescue environment must stay usable so the user can
+# repair whatever went wrong.
+Options=defaults,nofail
+
+[Install]
+WantedBy=local-fs.target

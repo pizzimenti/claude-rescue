@@ -1,0 +1,36 @@
+[Unit]
+Description=Redirect Claude Code conversation history to /persist
+Documentation=https://github.com/pizzimenti/claude-rescue
+# Requires+After persist.mount means this unit only runs when /persist
+# actually mounted successfully. On machines without a RESCUE_PERSIST
+# partition, persist.mount is skipped (ConditionPathExists in that unit),
+# which propagates here as "unit not started" — silent graceful fallback
+# to the default tmpfs-backed /root/.claude/projects.
+Requires=persist.mount
+After=persist.mount
+Before=getty@tty1.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# The work is trivial and idempotent: make sure /persist/claude/projects
+# exists, then replace /root/.claude/projects with a symlink pointing to
+# it. Runs on every boot — if a prior boot already did this, the mkdir/ln
+# -sfn are no-ops.
+#
+# Why only redirect /root/.claude/projects and not all of /root/.claude/
+# — that directory also holds per-install state Claude generates at
+# install/run time: settings.json, the changelog cache, backups of
+# .claude.json, downloads/, etc. Most of that should stay on the
+# ephemeral squashfs/tmpfs and be regenerated as needed. Conversation
+# history is the one subtree we genuinely want durable across reboots —
+# it lives under projects/<escaped-cwd>/ — so we redirect only that.
+# (The native installer's binary bundle lives entirely outside .claude/,
+# at /root/.local/share/claude/versions/, so it's unaffected either way.)
+ExecStart=/usr/bin/install -d -m 0700 /persist/claude/projects
+ExecStart=/usr/bin/install -d -m 0700 /root/.claude
+ExecStart=/usr/bin/bash -c '[[ -L /root/.claude/projects ]] || [[ ! -e /root/.claude/projects ]] || rm -rf /root/.claude/projects'
+ExecStart=/usr/bin/ln -sfn /persist/claude/projects /root/.claude/projects
+
+[Install]
+WantedBy=multi-user.target

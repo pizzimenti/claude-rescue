@@ -20,21 +20,35 @@ Claude Code for AI-assisted repair. A field-repair appliance, not a desktop dist
 
 ### Rejected alternatives
 
-- Alpine: musl libc breaks Node.js / Claude Code
+- Alpine: musl libc — was a hard blocker in M1 (Node.js / Claude Code's
+  npm install), and remains a concern for the native Claude binary
+  (Anthropic's prebuilt is glibc-linked).
 - Debian Live: older kernels = worse laptop Wi-Fi
 - Arch derivatives (Manjaro, EndeavourOS): delays packages, adds layers
 
 ## Milestones
 
-| # | Name               | Status  |
-|---|--------------------|---------|
-| 1 | Foundation         | DONE    |
-| 2 | Runtime skeleton   | NEXT    |
-| 3 | Networking         | pending |
-| 4 | Storage & repair   | pending |
-| 5 | Persistence        | pending |
-| 6 | Claude module      | pending |
-| 7 | Polish & hardening | pending |
+| # | Name               | Status                              |
+|---|--------------------|-------------------------------------|
+| 1 | Foundation         | DONE (v0.1.0)                       |
+| 2 | Runtime skeleton   | pending                             |
+| 3 | Networking         | pending                             |
+| 4 | Storage & repair   | pending                             |
+| 5 | Persistence        | DONE in v0.2.0 (brought forward)    |
+| 6 | Claude module      | DONE in v0.2.0 (brought forward)    |
+| 7 | Polish & hardening | pending                             |
+
+**Release history**
+
+- **v0.1.0 (M1)** — bootable Arch ISO, autologin, NetworkManager, dialog
+  launcher, Claude Code via npm.
+- **v0.2.0** — native Claude installer (dropped npm/nodejs);
+  `RESCUE_PERSIST` → `/persist` mount with graceful degradation; Claude
+  conversation persistence via `/root/.claude/projects` symlink;
+  self-context `/root/CLAUDE.md`; `DISABLE_AUTOUPDATER=1` and
+  `/root/.local/bin` on PATH for Claude's runtime self-checks. (Bypass
+  mode was attempted but reverted — recent Claude refuses
+  `--dangerously-skip-permissions` under euid 0; see decision log.)
 
 ## Milestone 1 tasks
 

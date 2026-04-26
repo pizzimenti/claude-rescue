@@ -38,8 +38,8 @@ if [[ $EUID -ne 0 ]]; then
     if [[ "$SETUP_CREDS" =~ ^[Yy] ]]; then
         if ! command -v claude &>/dev/null; then
             echo ""
-            echo "  warn: 'claude' is not installed. Install it first:"
-            echo "    npm install -g @anthropic-ai/claude-code"
+            echo "  warn: 'claude' is not installed on this host. Install it first:"
+            echo "    curl -fsSL https://claude.ai/install.sh | bash"
             echo "  then rebuild to embed credentials."
             echo ""
         else
@@ -73,6 +73,38 @@ if [[ $EUID -ne 0 ]]; then
                 rm -rf "${FRESH_HOME:-}" "${TOKEN_LOG:-}" 2>/dev/null || true
             }
             trap _phase1_cleanup EXIT INT TERM HUP
+            # Resolve the user's preferred browser NOW, while HOME still
+            # points at their real config. Without this, `claude setup-token`
+            # runs with HOME=$FRESH_HOME (empty), its OAuth helper calls
+            # xdg-open, and xdg-open can't find ~/.config/mimeapps.list —
+            # so it falls back to the system-wide https handler. On KDE
+            # that's Falkon, not Chrome/Firefox/whatever you actually use.
+            # Fix: export $BROWSER explicitly. xdg-open (and Claude) honor
+            # $BROWSER before touching the mime database, so the isolated
+            # HOME no longer leaks into browser selection.
+            if [[ -z "${BROWSER:-}" ]] && command -v xdg-settings &>/dev/null; then
+                _default_desktop=$(xdg-settings get default-web-browser 2>/dev/null || true)
+                for _appdir in "$HOME/.local/share/applications" /usr/local/share/applications /usr/share/applications; do
+                    _appfile="$_appdir/$_default_desktop"
+                    if [[ -n "$_default_desktop" && -f "$_appfile" ]]; then
+                        # Strip args and field codes (%u, %U, %f, etc.) from Exec=.
+                        _exec=$(awk -F= '/^Exec=/ { split($2, a, " "); print a[1]; exit }' "$_appfile")
+                        if [[ -n "$_exec" ]] && command -v "$_exec" &>/dev/null; then
+                            export BROWSER="$_exec"
+                            break
+                        fi
+                    fi
+                done
+                unset _default_desktop _appdir _appfile _exec
+            fi
+            if [[ -n "${BROWSER:-}" ]]; then
+                echo "  Using browser: $BROWSER"
+            else
+                echo "  warn: could not resolve a default browser; claude setup-token"
+                echo "        will fall back to the system default (which on KDE is"
+                echo "        often Falkon). Set \$BROWSER in your shell if you want"
+                echo "        a specific one."
+            fi
             # Run interactively on the real user's tty. tee captures the
             # printed token without hiding the URL/prompts from the user.
             # `|| true` keeps a setup-token failure (network down, browser
@@ -230,11 +262,22 @@ if [[ -z "$SQUASHFS" ]]; then
     echo "         archiso may have changed its work-tree layout — update this check." >&2
     exit 1
 fi
-if ! unsquashfs -l "$SQUASHFS" 2>/dev/null | grep -qE '/(usr/bin|usr/local/bin)/claude$'; then
+# Capture grep output to a variable instead of piping to `grep -qE`.
+# Why: under `set -o pipefail`, `unsquashfs -l | grep -q` is a race —
+# grep closes its stdin on the first match, unsquashfs (which streams
+# ~5000 paths) gets SIGPIPE on its next write and exits 141, and
+# pipefail reports that 141 as the pipeline status. The `if !` then
+# fires the error branch on a successful match. The variable capture
+# drains unsquashfs fully, and the pipeline's exit status is just
+# grep's (0 = match, 1 = no match, coerced to 0 by `|| true` so the
+# outer `set -e` stays happy).
+CLAUDE_PATHS=$(unsquashfs -l "$SQUASHFS" 2>/dev/null | grep -E '/(usr/bin|usr/local/bin)/claude$' || true)
+if [[ -z "$CLAUDE_PATHS" ]]; then
     echo "  error: claude binary not found inside $SQUASHFS." >&2
     echo "         Either the customize_airootfs.sh hook did not run (archiso may" >&2
-    echo "         have removed the deprecated mechanism), or the npm install inside" >&2
-    echo "         the chroot failed silently. Check the mkarchiso output above." >&2
+    echo "         have removed the deprecated mechanism), or the native installer" >&2
+    echo "         (curl https://claude.ai/install.sh | bash) failed inside the" >&2
+    echo "         chroot. Check the mkarchiso output above." >&2
     exit 1
 fi
 echo "==> claude binary present in squashfs."

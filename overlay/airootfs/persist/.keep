@@ -1,0 +1,4 @@
+# Mountpoint placeholder for the RESCUE_PERSIST persistence partition.
+# persist.mount mounts /dev/disk/by-label/RESCUE_PERSIST here at boot; this
+# file exists so the directory is present in the squashfs (mkarchiso won't
+# preserve empty directories on its own).

@@ -64,3 +64,130 @@
 - Recovery context requires root access to everything
 - A password gate is friction with no benefit (physical access = game over anyway)
 - Matches behavior of standard Arch ISO and other recovery tools
+
+---
+
+## Claude Code install: native installer, not npm (0.2.0)
+
+**Decision:** Install Claude Code via `curl -fsSL https://claude.ai/install.sh
+| bash` during `customize_airootfs.sh` instead of `npm install -g
+@anthropic-ai/claude-code@X.Y.Z`. Drop `nodejs` and `npm` from the package list.
+
+**Rationale:**
+- The native installer is the supported install path going forward;
+  Anthropic has indicated the npm package is not the primary distribution.
+- The native install is a self-contained binary bundle — no Node.js runtime
+  needed at runtime, which removes `nodejs` + `npm` (~100MB + transitive
+  deps) from the shipped squashfs.
+- One fewer language ecosystem to reason about inside the rescue image.
+
+**Trade-off accepted — no version pinning:** the native installer always
+pulls latest at build time. We compensate by reading `claude --version`
+after install and writing it into `/root/.claude.json` as
+`lastOnboardingVersion`, so the pre-baked onboarding-complete state stays
+in lockstep automatically. Build is now self-healing against upstream
+version bumps instead of requiring a manual pin update in two places.
+
+**Trade-off accepted — auto-update on a read-only root:** the native
+installer ships with a background auto-updater. We set
+`DISABLE_AUTOUPDATER=1` in `/etc/profile.d/claude-env.sh` because updates
+would only land in the tmpfs overlay and vanish at the next reboot —
+pointless write churn and noisy logs.
+
+**Trade-off accepted — install path off default PATH:** the native
+installer puts the launcher at `/root/.local/bin/claude` and Claude's
+own runtime self-check warns when its install dir isn't on PATH. The
+build-time symlink to `/usr/local/bin/claude` resolves the binary for
+the shell but doesn't satisfy that internal check, so we also prepend
+`/root/.local/bin` to PATH in `/etc/profile.d/claude-env.sh`. Quietest
+fix; both paths now point at the same launcher.
+
+---
+
+## Persistence wired in 0.2.0 (brought forward from M5)
+
+**Decision:** Ship the full `RESCUE_PERSIST` mount infrastructure in the
+0.2.0 release, rather than waiting for M5. Systemd `persist.mount` unit
+mounts `/dev/disk/by-label/RESCUE_PERSIST` at `/persist` with
+`ConditionPathExists` + `nofail` for graceful absence.
+
+**Rationale:**
+- The Claude-conversation-persistence ask in 0.2.0 needs a durable
+  mountpoint somewhere. Building a Claude-specific mount mechanism and
+  then ripping it out for a generic one in M5 is strictly more work than
+  doing the generic one now.
+- Once `/persist` exists, future features (connection profiles, logs,
+  notes) reuse it with zero additional plumbing.
+- The mount unit is <20 lines and the graceful-degradation semantics are
+  well-understood, so the cost of landing it early is negligible.
+
+`claude-persist.service` is a thin oneshot layered on top of
+`persist.mount` — it symlinks `/root/.claude/projects` →
+`/persist/claude/projects` only when `/persist` actually mounted. Only
+the conversation-history subtree is redirected; the rest of
+`/root/.claude/` (settings, cache, backups) stays ephemeral, and the
+installer's binary bundle is outside `.claude/` entirely (lives at
+`/root/.local/share/claude/versions/<version>`) so it's unaffected
+either way.
+
+---
+
+## Permission bypass: attempted, reverted (0.2.0)
+
+**Decision:** The rescue launcher invokes plain `claude`, NOT `claude
+--dangerously-skip-permissions`. Per-tool approval prompts remain.
+
+**Original intent:** we wanted bypass mode by default. Threat model didn't
+justify the prompts (physical access to a running rescue USB already means
+total system control via autologin-root); UX was the whole point of the
+0.2.0 ergonomics bundle; and Claude has explicit `/root/CLAUDE.md` guidance
+about `/` vs `/mnt/*` as a replacement guardrail.
+
+**Why it didn't work:** recent Claude Code refuses
+`--dangerously-skip-permissions` when euid is 0, as a safety backstop.
+The rescue ISO autologins as root unconditionally — that's not negotiable
+in a recovery context — so the flag simply breaks launch. Dropping the
+flag is the only path that keeps Claude running at all.
+
+**What we kept:** `bypassPermissionsModeAccepted: true` in the pre-baked
+`/root/.claude.json` stays. It's harmless when unused, and preserved so a
+user who manually `su`s to a non-root account and opts into bypass mode
+there doesn't hit the first-run acceptance dialog.
+
+**Follow-up options if we want this back:**
+- Create a non-root rescue user and run the launcher as that user with
+  sudo available for privileged operations. Biggest UX cost but proper
+  fix.
+- Watch upstream Claude Code for a way to opt into bypass mode as root
+  (e.g. an explicit env var or config acknowledging the risk).
+- Land additional in-process guardrails via `CLAUDE.md` so the
+  per-prompt friction is the only thing separating the user from a
+  mostly-autonomous repair loop — arguably where we are now.
+
+---
+
+## Self-context file: /root/CLAUDE.md (0.2.0)
+
+**Decision:** Ship a `CLAUDE.md` at `/root/CLAUDE.md` explaining the
+rescue environment to Claude: what it is, what `/mnt` vs `/` means, where
+persistence lives, what recovery tools are already present, how to
+approach destructive operations on a target disk.
+
+**Rationale:**
+- Without this, every rescue session starts with the user spending
+  several minutes re-explaining a genuinely unusual setup (squashfs+tmpfs,
+  target at /mnt, autologin-as-root, ephemeral network state).
+- `CLAUDE.md` is Claude Code's documented project-local instructions
+  mechanism, loaded automatically when Claude runs from the directory
+  containing it.
+- The launcher always invokes Claude with cwd=/root, so `/root/CLAUDE.md`
+  loads reliably on the menu-launched path.
+
+**Chose `/root/CLAUDE.md` over `/etc/claude-code/CLAUDE.md`:** the
+`/etc/claude-code/` managed-policy location is mentioned in some Claude
+docs but its loading semantics are less well-attested than the
+project-local convention. The trade-off is that users who `cd /mnt/...`
+and run claude directly (outside the launcher) will miss the context —
+acceptable, because they can re-orient Claude manually, and arguably the
+target machine's own CLAUDE.md (if any) should take precedence in that
+context anyway.
