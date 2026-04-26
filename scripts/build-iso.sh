@@ -87,15 +87,41 @@ if [[ $EUID -ne 0 ]]; then
                 for _appdir in "$HOME/.local/share/applications" /usr/local/share/applications /usr/share/applications; do
                     _appfile="$_appdir/$_default_desktop"
                     if [[ -n "$_default_desktop" && -f "$_appfile" ]]; then
-                        # Strip args and field codes (%u, %U, %f, etc.) from Exec=.
-                        _exec=$(awk -F= '/^Exec=/ { split($2, a, " "); print a[1]; exit }' "$_appfile")
-                        if [[ -n "$_exec" ]] && command -v "$_exec" &>/dev/null; then
+                        # Parse the Exec= line per the Desktop Entry
+                        # Specification: strip the "Exec=" prefix, drop
+                        # field codes (%f %F %u %U %d %D %n %N %i %c %k
+                        # %v %m), collapse whitespace.
+                        #
+                        # We intentionally keep the FULL command (not just
+                        # the first token), because Flatpak/Snap browser
+                        # entries look like:
+                        #   Exec=/usr/bin/flatpak run --branch=stable \
+                        #        --command=firefox org.mozilla.firefox %U
+                        # Truncating to `flatpak` alone makes BROWSER
+                        # unrunnable. xdg-open honors multi-word
+                        # $BROWSER values via shell word-splitting.
+                        _exec=$(awk '
+                            /^Exec=/ {
+                                sub(/^Exec=/, "")
+                                gsub(/%[a-zA-Z]/, "")
+                                gsub(/[[:space:]]+/, " ")
+                                sub(/^[[:space:]]+/, "")
+                                sub(/[[:space:]]+$/, "")
+                                print
+                                exit
+                            }
+                        ' "$_appfile")
+                        # Verify only the first word is a real executable;
+                        # the rest is arguments and doesn't need to be on
+                        # PATH.
+                        _first=${_exec%% *}
+                        if [[ -n "$_first" ]] && command -v "$_first" &>/dev/null; then
                             export BROWSER="$_exec"
                             break
                         fi
                     fi
                 done
-                unset _default_desktop _appdir _appfile _exec
+                unset _default_desktop _appdir _appfile _exec _first
             fi
             if [[ -n "${BROWSER:-}" ]]; then
                 echo "  Using browser: $BROWSER"
